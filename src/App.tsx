@@ -20,15 +20,15 @@ const MainContent: React.FC = () => {
 
   return (
     <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 bg-slate-950">
-      {activeTab === 'dashboard' && <DashboardView />}
-      {activeTab === 'street_lights' && <StreetLightsView />}
-      {activeTab === 'fault_detection' && <FaultDetectionView />}
-      {activeTab === 'map' && <MapView />}
-      {activeTab === 'sensors' && <SensorDataView />}
-      {activeTab === 'hardware' && <HardwareSetupView />}
-      {activeTab === 'history' && <FaultHistoryView />}
-      {activeTab === 'alerts' && <AlertsView />}
-      {activeTab === 'settings' && <SettingsView />}
+      {activeTab === 'dashboard'      && <DashboardView />}
+      {activeTab === 'street_lights'  && <StreetLightsView />}
+      {activeTab === 'fault_detection'&& <FaultDetectionView />}
+      {activeTab === 'map'            && <MapView />}
+      {activeTab === 'sensors'        && <SensorDataView />}
+      {activeTab === 'hardware'       && <HardwareSetupView />}
+      {activeTab === 'history'        && <FaultHistoryView />}
+      {activeTab === 'alerts'         && <AlertsView />}
+      {activeTab === 'settings'       && <SettingsView />}
     </main>
   );
 };
@@ -45,7 +45,6 @@ export function App() {
         </div>
 
         <FaultSimulatorDock />
-
         <IoTArchitectureModal />
         <LightDetailModal />
       </div>

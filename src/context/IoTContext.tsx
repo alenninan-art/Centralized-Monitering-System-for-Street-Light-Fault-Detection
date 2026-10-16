@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  type ReactNode,
+} from 'react';
 import type {
   StreetLight,
   FaultRecord,
@@ -7,11 +14,19 @@ import type {
   SystemStats,
   Severity,
 } from '../types/iot';
+import { INITIAL_STREET_LIGHTS, INITIAL_FAULTS, INITIAL_ALERTS } from '../data/mockStreetLights';
 import {
-  INITIAL_STREET_LIGHTS,
-  INITIAL_FAULTS,
-  INITIAL_ALERTS,
-} from '../data/mockStreetLights';
+  seedDatabaseIfEmpty,
+  subscribeToStreetLights,
+  subscribeToFaults,
+  subscribeToAlerts,
+  updateStreetLightInDB,
+  addFaultToDB,
+  updateFaultInDB,
+  addAlertToDB,
+  updateAlertInDB,
+  clearAlertsInDB,
+} from '../firebase';
 import confetti from 'canvas-confetti';
 
 export type NavigationTab =
@@ -40,7 +55,8 @@ interface IoTContextType {
   lastSimulatedEvent: string | null;
   setLastSimulatedEvent: (msg: string | null) => void;
   systemStats: SystemStats;
-  
+  isFirebaseConnected: boolean;
+
   // Actions
   simulateFault: (poleId: string, faultType: FaultType) => void;
   resolveFault: (poleId: string) => void;
@@ -64,51 +80,53 @@ export const IoTProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
   const [isArchitectureModalOpen, setIsArchitectureModalOpen] = useState<boolean>(false);
   const [lastSimulatedEvent, setLastSimulatedEvent] = useState<string | null>(null);
+  const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(false);
 
-  // Compute stats dynamically from street light state
-  const systemStats = useMemo<SystemStats>(() => {
-    const totalLights = streetLights.length;
-    const workingCount = streetLights.filter((l) => l.status === 'working').length;
-    const faultCount = streetLights.filter((l) => l.status === 'fault').length;
-    const warningCount = streetLights.filter((l) => l.status === 'warning').length;
-    const offlineCount = streetLights.filter((l) => l.status === 'offline').length;
+  // ── Firebase: seed & subscribe ─────────────────────────────────────────────
+  useEffect(() => {
+    let unsubLights: (() => void) | null = null;
+    let unsubFaults: (() => void) | null = null;
+    let unsubAlerts: (() => void) | null = null;
 
-    const totalPowerWatts = streetLights.reduce((acc, l) => acc + l.power, 0);
-    const avgVoltage =
-      workingCount > 0
-        ? Math.round(
-            streetLights
-              .filter((l) => l.status === 'working' || l.status === 'warning')
-              .reduce((acc, l) => acc + l.voltage, 0) / (workingCount + warningCount)
-          )
-        : 0;
+    (async () => {
+      try {
+        // Seed mock data if the DB is empty (first run)
+        await seedDatabaseIfEmpty();
 
-    const energySavedPercent = Math.round(
-      100 - (totalPowerWatts / (totalLights * 100)) * 100
-    );
+        // Subscribe to real-time updates
+        unsubLights = subscribeToStreetLights((lights) => {
+          setStreetLights(lights);
+          setIsFirebaseConnected(true);
+        });
 
-    const uptimePercent = Number(
-      (((totalLights - faultCount - offlineCount) / totalLights) * 100).toFixed(1)
-    );
+        unsubFaults = subscribeToFaults((faults) => {
+          setFaultHistory(faults);
+        });
 
-    return {
-      totalLights,
-      workingCount,
-      faultCount,
-      warningCount,
-      offlineCount,
-      totalPowerWatts: Math.round(totalPowerWatts * 10) / 10,
-      energySavedPercent: Math.max(0, Math.min(100, energySavedPercent)),
-      avgVoltage,
-      uptimePercent,
+        unsubAlerts = subscribeToAlerts((alerts) => {
+          setAlerts(alerts);
+        });
+      } catch (err) {
+        console.error('[IoTContext] Firebase init error:', err);
+        // Fall back gracefully to mock data — already set as initial state
+        setIsFirebaseConnected(false);
+      }
+    })();
+
+    return () => {
+      if (unsubLights) unsubLights();
+      if (unsubFaults) unsubFaults();
+      if (unsubAlerts) unsubAlerts();
     };
-  }, [streetLights]);
+  }, []);
 
-  // Live simulation tick every 4 seconds to make sensor telemetry look real-time
+  // ── Live sensor telemetry tick (working lights only) ──────────────────────
+  // Runs every 4 s. Writes updated sensor values back to Firebase so the
+  // dashboard stays "live" even when no real ESP32 is connected.
   useEffect(() => {
     const timer = setInterval(() => {
-      setStreetLights((prevLights) =>
-        prevLights.map((light) => {
+      setStreetLights((prevLights) => {
+        const updated = prevLights.map((light) => {
           if (light.status !== 'working') return light;
 
           const voltDelta = (Math.random() - 0.5) * 2;
@@ -124,14 +142,62 @@ export const IoTProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             power: light.relayState ? newPower : 0,
             lastUpdated: 'Just now',
           };
-        })
-      );
+        });
+
+        // Async-write updated telemetry to Firebase (fire-and-forget)
+        updated.forEach((light) => {
+          if (light.status === 'working') {
+            updateStreetLightInDB(light.id, {
+              voltage: light.voltage,
+              current: light.current,
+              power: light.power,
+              lastUpdated: light.lastUpdated,
+            }).catch(() => {/* swallow network errors silently */});
+          }
+        });
+
+        return updated;
+      });
     }, 4000);
 
     return () => clearInterval(timer);
   }, []);
 
-  // Action: Simulate Fault
+  // ── Computed system stats ──────────────────────────────────────────────────
+  const systemStats = useMemo<SystemStats>(() => {
+    const totalLights = streetLights.length;
+    const workingCount  = streetLights.filter((l) => l.status === 'working').length;
+    const faultCount    = streetLights.filter((l) => l.status === 'fault').length;
+    const warningCount  = streetLights.filter((l) => l.status === 'warning').length;
+    const offlineCount  = streetLights.filter((l) => l.status === 'offline').length;
+
+    const totalPowerWatts = streetLights.reduce((acc, l) => acc + l.power, 0);
+    const avgVoltage =
+      workingCount > 0
+        ? Math.round(
+            streetLights
+              .filter((l) => l.status === 'working' || l.status === 'warning')
+              .reduce((acc, l) => acc + l.voltage, 0) / (workingCount + warningCount)
+          )
+        : 0;
+
+    const energySavedPercent = Math.round(100 - (totalPowerWatts / (totalLights * 100)) * 100);
+    const uptimePercent = Number((((totalLights - faultCount - offlineCount) / totalLights) * 100).toFixed(1));
+
+    return {
+      totalLights,
+      workingCount,
+      faultCount,
+      warningCount,
+      offlineCount,
+      totalPowerWatts: Math.round(totalPowerWatts * 10) / 10,
+      energySavedPercent: Math.max(0, Math.min(100, energySavedPercent)),
+      avgVoltage,
+      uptimePercent,
+    };
+  }, [streetLights]);
+
+  // ── Action: Simulate Fault ─────────────────────────────────────────────────
   const simulateFault = (poleId: string, faultType: FaultType) => {
     const targetPole = streetLights.find((l) => l.id === poleId);
     if (!targetPole) return;
@@ -139,7 +205,7 @@ export const IoTProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     let newStatus: StreetLight['status'] = 'fault';
     let newVoltage = targetPole.voltage;
     let newCurrent = targetPole.current;
-    let newPower = targetPole.power;
+    let newPower   = targetPole.power;
     let newLightIntensity = targetPole.lightIntensity;
     let severity: Severity = 'high';
     let faultTypeName = 'Hardware Fault';
@@ -149,96 +215,64 @@ export const IoTProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       case 'lamp_failure':
         faultTypeName = 'Lamp Failure';
         severity = 'high';
-        newVoltage = 230;
-        newCurrent = 0.0;
-        newPower = 0;
-        newLightIntensity = 0;
+        newVoltage = 230; newCurrent = 0.0; newPower = 0; newLightIntensity = 0;
         description = 'LDR sensor reads 0 Lux while relay is energized with 230V line input.';
         break;
-
       case 'overcurrent':
         faultTypeName = 'Overcurrent Condition';
         severity = 'critical';
-        newVoltage = 218;
-        newCurrent = 2.95;
-        newPower = 643.2;
-        newLightIntensity = 100;
+        newVoltage = 218; newCurrent = 2.95; newPower = 643.2; newLightIntensity = 100;
         description = 'Current sensor ACS712 recorded 2.95A (Safety limit: 0.70A). Thermal risk!';
         break;
-
       case 'undervoltage':
         newStatus = 'warning';
         faultTypeName = 'Undervoltage Sag';
         severity = 'medium';
-        newVoltage = 175;
-        newCurrent = 0.31;
-        newPower = 54.2;
-        newLightIntensity = 50;
+        newVoltage = 175; newCurrent = 0.31; newPower = 54.2; newLightIntensity = 50;
         description = 'ZMPT101B reported grid voltage dropped below critical limit of 190V.';
         break;
-
       case 'overvoltage':
         newStatus = 'warning';
         faultTypeName = 'Overvoltage Spike';
         severity = 'high';
-        newVoltage = 265;
-        newCurrent = 0.58;
-        newPower = 153.7;
-        newLightIntensity = 100;
+        newVoltage = 265; newCurrent = 0.58; newPower = 153.7; newLightIntensity = 100;
         description = 'Grid voltage spiked to 265V. Component protection trip risk.';
         break;
-
       case 'power_failure':
         faultTypeName = 'Total Power Failure';
         severity = 'critical';
-        newVoltage = 0;
-        newCurrent = 0.0;
-        newPower = 0;
-        newLightIntensity = 0;
+        newVoltage = 0; newCurrent = 0.0; newPower = 0; newLightIntensity = 0;
         description = '0V line voltage detected. Feeder cable fault or breaker tripped.';
         break;
-
       case 'open_circuit':
         faultTypeName = 'Open Circuit Break';
         severity = 'high';
-        newVoltage = 230;
-        newCurrent = 0.0;
-        newPower = 0;
-        newLightIntensity = 0;
+        newVoltage = 230; newCurrent = 0.0; newPower = 0; newLightIntensity = 0;
         description = 'Infinite resistance path detected across lamp terminals.';
         break;
-
       case 'communication_failure':
         newStatus = 'offline';
         faultTypeName = 'ESP32 Comm Timeout';
         severity = 'medium';
-        newVoltage = 0;
-        newCurrent = 0.0;
-        newPower = 0;
-        newLightIntensity = 0;
+        newVoltage = 0; newCurrent = 0.0; newPower = 0; newLightIntensity = 0;
         description = 'No MQTT ping response received from ESP32 MAC endpoint for > 5 min.';
         break;
     }
 
     const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+    const updatedLight: Partial<StreetLight> = {
+      status: newStatus, faultType, severity,
+      voltage: newVoltage, current: newCurrent, power: newPower,
+      lightIntensity: newLightIntensity, lastUpdated: 'Just now',
+    };
+
+    // Optimistic UI update
     setStreetLights((prev) =>
-      prev.map((l) =>
-        l.id === poleId
-          ? {
-              ...l,
-              status: newStatus,
-              faultType,
-              severity,
-              voltage: newVoltage,
-              current: newCurrent,
-              power: newPower,
-              lightIntensity: newLightIntensity,
-              lastUpdated: 'Just now',
-            }
-          : l
-      )
+      prev.map((l) => (l.id === poleId ? { ...l, ...updatedLight } : l))
     );
+    // Persist to Firebase
+    updateStreetLightInDB(poleId, updatedLight);
 
     const newFaultRecord: FaultRecord = {
       faultId: `FLT-${Math.floor(9000 + Math.random() * 900)}`,
@@ -252,10 +286,10 @@ export const IoTProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       status: 'unresolved',
       description,
     };
-    setFaultHistory((prev) => [newFaultRecord, ...prev]);
+    addFaultToDB(newFaultRecord);
 
     const newAlert: AlertNotification = {
-      id: `ALT-${Date.now().toString().slice(-4)}`,
+      id: `ALT-${Date.now().toString().slice(-6)}`,
       poleId,
       location: targetPole.location,
       title: `${severity.toUpperCase()}: ${faultTypeName.toUpperCase()}`,
@@ -264,78 +298,65 @@ export const IoTProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       timestamp: timeString,
       read: false,
     };
-    setAlerts((prev) => [newAlert, ...prev]);
+    addAlertToDB(newAlert);
 
-    setLastSimulatedEvent(`🚨 FAULT SIMULATED: ${targetPole.id} - ${faultTypeName} detected!`);
+    setLastSimulatedEvent(`🚨 FAULT SIMULATED: ${targetPole.id} — ${faultTypeName}`);
     setTimeout(() => setLastSimulatedEvent(null), 6000);
   };
 
+  // ── Action: Resolve Fault ──────────────────────────────────────────────────
   const resolveFault = (poleId: string) => {
     const targetPole = streetLights.find((l) => l.id === poleId);
     if (!targetPole) return;
 
     const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    setStreetLights((prev) =>
-      prev.map((l) =>
-        l.id === poleId
-          ? {
-              ...l,
-              status: 'working',
-              faultType: 'none',
-              severity: 'none',
-              voltage: 230,
-              current: 0.42,
-              power: 96.6,
-              lightIntensity: 88,
-              relayState: true,
-              dimmingLevel: 100,
-              lastUpdated: 'Just now',
-            }
-          : l
-      )
-    );
+    const restoredState: Partial<StreetLight> = {
+      status: 'working', faultType: 'none', severity: 'none',
+      voltage: 230, current: 0.42, power: 96.6,
+      lightIntensity: 88, relayState: true, dimmingLevel: 100,
+      lastUpdated: 'Just now',
+    };
 
-    setFaultHistory((prev) =>
-      prev.map((rec) =>
-        rec.poleId === poleId && rec.status !== 'resolved'
-          ? { ...rec, status: 'resolved', resolvedTime: timeString }
-          : rec
-      )
+    setStreetLights((prev) =>
+      prev.map((l) => (l.id === poleId ? { ...l, ...restoredState } : l))
     );
+    updateStreetLightInDB(poleId, restoredState);
+
+    // Mark all unresolved faults for this pole as resolved
+    faultHistory
+      .filter((r) => r.poleId === poleId && r.status !== 'resolved')
+      .forEach((r) => {
+        updateFaultInDB(r.faultId, { status: 'resolved', resolvedTime: timeString });
+      });
 
     const newAlert: AlertNotification = {
-      id: `ALT-${Date.now().toString().slice(-4)}`,
+      id: `ALT-${Date.now().toString().slice(-6)}`,
       poleId,
       location: targetPole.location,
-      title: `FAULT RESOLVED`,
+      title: 'FAULT RESOLVED',
       message: `Street light ${targetPole.id} on ${targetPole.location} has been successfully restored to Working status.`,
       severity: 'low',
       timestamp: timeString,
       read: false,
     };
-    setAlerts((prev) => [newAlert, ...prev]);
+    addAlertToDB(newAlert);
 
     try {
-      confetti({
-        particleCount: 50,
-        spread: 60,
-        origin: { y: 0.8 },
-      });
-    } catch {
-      // fallback
-    }
+      confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
+    } catch { /* noop */ }
 
     setLastSimulatedEvent(`✅ RESOLVED: ${targetPole.id} restored to Working condition.`);
     setTimeout(() => setLastSimulatedEvent(null), 5000);
   };
 
+  // ── Action: Toggle Relay ───────────────────────────────────────────────────
   const toggleRelay = (poleId: string) => {
     setStreetLights((prev) =>
       prev.map((l) => {
         if (l.id !== poleId) return l;
         const nextRelay = !l.relayState;
-        return {
+        const updated = {
           ...l,
           relayState: nextRelay,
           power: nextRelay ? 96.6 : 0,
@@ -343,17 +364,26 @@ export const IoTProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           lightIntensity: nextRelay ? l.lightIntensity || 85 : 0,
           lastUpdated: 'Just now',
         };
+        updateStreetLightInDB(poleId, {
+          relayState: updated.relayState,
+          power: updated.power,
+          current: updated.current,
+          lightIntensity: updated.lightIntensity,
+          lastUpdated: updated.lastUpdated,
+        });
+        return updated;
       })
     );
   };
 
+  // ── Action: Set Dimming ────────────────────────────────────────────────────
   const setDimming = (poleId: string, level: number) => {
     setStreetLights((prev) =>
       prev.map((l) => {
         if (l.id !== poleId) return l;
         const normalizedLevel = Math.max(0, Math.min(100, level));
         const powerRatio = normalizedLevel / 100;
-        return {
+        const updated = {
           ...l,
           dimmingLevel: normalizedLevel,
           lightIntensity: normalizedLevel,
@@ -361,34 +391,40 @@ export const IoTProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           current: Math.round(0.42 * powerRatio * 100) / 100,
           lastUpdated: 'Just now',
         };
+        updateStreetLightInDB(poleId, {
+          dimmingLevel: updated.dimmingLevel,
+          lightIntensity: updated.lightIntensity,
+          power: updated.power,
+          current: updated.current,
+        });
+        return updated;
       })
     );
   };
 
-  const locatePoleOnMap = (poleId: string) => {
-    setSelectedPoleId(poleId);
-    setActiveTab('map');
-  };
+  // ── Action: Navigation helpers ─────────────────────────────────────────────
+  const locatePoleOnMap    = (poleId: string) => { setSelectedPoleId(poleId); setActiveTab('map'); };
+  const inspectPoleDetails = (poleId: string) => { setSelectedPoleId(poleId); setIsDetailModalOpen(true); };
 
-  const inspectPoleDetails = (poleId: string) => {
-    setSelectedPoleId(poleId);
-    setIsDetailModalOpen(true);
-  };
-
+  // ── Action: Alert management ───────────────────────────────────────────────
   const markAlertRead = (alertId: string) => {
-    setAlerts((prev) =>
-      prev.map((a) => (a.id === alertId ? { ...a, read: true } : a))
-    );
+    setAlerts((prev) => prev.map((a) => (a.id === alertId ? { ...a, read: true } : a)));
+    updateAlertInDB(alertId, { read: true });
   };
 
   const clearAllAlerts = () => {
     setAlerts([]);
+    clearAlertsInDB();
   };
 
+  // ── Action: Reset system ───────────────────────────────────────────────────
   const resetSystem = () => {
+    // Reset local state
     setStreetLights(INITIAL_STREET_LIGHTS);
     setFaultHistory(INITIAL_FAULTS);
     setAlerts(INITIAL_ALERTS);
+    // Re-seed Firebase with defaults
+    seedDatabaseIfEmpty().catch(console.error);
     setLastSimulatedEvent('System restored to default prototype state.');
     setTimeout(() => setLastSimulatedEvent(null), 4000);
   };
@@ -410,6 +446,7 @@ export const IoTProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         lastSimulatedEvent,
         setLastSimulatedEvent,
         systemStats,
+        isFirebaseConnected,
         simulateFault,
         resolveFault,
         toggleRelay,
@@ -428,8 +465,6 @@ export const IoTProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 export const useIoT = () => {
   const context = useContext(IoTContext);
-  if (!context) {
-    throw new Error('useIoT must be used within an IoTProvider');
-  }
+  if (!context) throw new Error('useIoT must be used within an IoTProvider');
   return context;
 };

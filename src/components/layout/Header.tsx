@@ -40,6 +40,7 @@ export const Header: React.FC = () => {
     clearAllAlerts,
     setActiveTab,
     lastSimulatedEvent,
+    isFirebaseConnected,
   } = useIoT();
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -74,16 +75,26 @@ export const Header: React.FC = () => {
           </p>
         </div>
 
-        {/* System Online badge */}
-        <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-950/40 px-3 py-1 text-[11px] font-bold text-emerald-400">
+        {/* System Online badge — reflects Firebase connection */}
+        <div className={`hidden sm:flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold transition-colors ${
+          isFirebaseConnected
+            ? 'border-emerald-500/25 bg-emerald-950/40 text-emerald-400'
+            : 'border-amber-500/25 bg-amber-950/40 text-amber-400'
+        }`}>
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isFirebaseConnected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${isFirebaseConnected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
           </span>
           <Radio className="h-3 w-3" />
-          <span className="uppercase tracking-wider">System Online</span>
-          <span className="text-emerald-600 font-medium">·</span>
-          <span className="text-emerald-300">{systemStats.totalLights - systemStats.offlineCount} Nodes</span>
+          <span className="uppercase tracking-wider">
+            {isFirebaseConnected ? 'Firebase Live' : 'Connecting...'}
+          </span>
+          {isFirebaseConnected && (
+            <>
+              <span className="text-emerald-600 font-medium">·</span>
+              <span className="text-emerald-300">{systemStats.totalLights - systemStats.offlineCount} Nodes</span>
+            </>
+          )}
         </div>
       </div>
 
@@ -114,11 +125,15 @@ export const Header: React.FC = () => {
           <span className="hidden md:inline">IoT Flow</span>
         </button>
 
-        {/* Connection status */}
-        <div className="hidden md:flex items-center gap-1.5 rounded-xl border border-slate-700/50 bg-slate-900/50 px-2.5 py-1.5 text-[10px] font-mono font-bold text-slate-400">
-          <Wifi className="h-3 w-3 text-cyan-400" />
-          <span>MQTT</span>
-          <span className="text-emerald-400">OK</span>
+        {/* Firebase DB connection status */}
+        <div className={`hidden md:flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[10px] font-mono font-bold transition-colors ${
+          isFirebaseConnected
+            ? 'border-emerald-800/40 bg-emerald-950/30 text-emerald-400'
+            : 'border-amber-800/40 bg-amber-950/30 text-amber-400'
+        }`}>
+          <Wifi className={`h-3 w-3 ${isFirebaseConnected ? 'text-emerald-400' : 'text-amber-400'}`} />
+          <span>Firebase</span>
+          <span>{isFirebaseConnected ? 'LIVE' : '...'}</span>
         </div>
 
         {/* Reset */}

@@ -66,11 +66,12 @@ export const DashboardView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const filteredLights = streetLights.filter((light) => {
+    if (!light?.id) return false; // guard against partial Firebase objects
     const matchesStatus = statusFilter === 'all' || light.status === statusFilter;
     const matchesSearch =
-      light.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      light.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      light.zone.toLowerCase().includes(searchTerm.toLowerCase());
+      (light.id ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (light.location ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (light.zone ?? '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 

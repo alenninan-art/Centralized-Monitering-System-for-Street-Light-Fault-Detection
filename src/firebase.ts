@@ -73,8 +73,31 @@ export function subscribeToStreetLights(
       callback(INITIAL_STREET_LIGHTS);
       return;
     }
-    // Firebase returns an object keyed by pole id
-    const lights: StreetLight[] = Object.values(val) as StreetLight[];
+    // Normalize each record — Firebase may omit fields that weren't written
+    const lights: StreetLight[] = (Object.values(val) as StreetLight[])
+      .filter((l) => l && l.id)                // drop any null/partial entries
+      .map((l) => ({
+        ...l,
+        status:          l.status          ?? 'working',
+        faultType:       l.faultType       ?? 'none',
+        severity:        l.severity        ?? 'none',
+        location:        l.location        ?? '',
+        zone:            l.zone            ?? '',
+        name:            l.name            ?? l.id,
+        voltage:         l.voltage         ?? 0,
+        current:         l.current         ?? 0,
+        power:           l.power           ?? 0,
+        lightIntensity:  l.lightIntensity  ?? 0,
+        temperature:     l.temperature     ?? 0,
+        relayState:      l.relayState      ?? false,
+        dimmingLevel:    l.dimmingLevel     ?? 100,
+        lastUpdated:     l.lastUpdated      ?? 'Unknown',
+        esp32DeviceId:   l.esp32DeviceId   ?? '',
+        energyConsumption: l.energyConsumption ?? 0,
+        installationDate:  l.installationDate  ?? '',
+        lat:             l.lat             ?? 0,
+        lng:             l.lng             ?? 0,
+      }));
     callback(lights);
   });
 }

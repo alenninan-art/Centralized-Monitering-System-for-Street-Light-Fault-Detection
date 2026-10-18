@@ -23,6 +23,7 @@ import {
   Thermometer,
   Radio,
   Gauge,
+  Cpu,
 } from 'lucide-react';
 
 export const SensorDataView: React.FC = () => {
@@ -30,191 +31,175 @@ export const SensorDataView: React.FC = () => {
   const [selectedPoleId, setSelectedPoleId] = useState<string>('SL-001');
 
   const selectedPole = streetLights.find((l) => l.id === selectedPoleId) || streetLights[0];
-
   const telemetryData = GENERATE_HISTORICAL_TELEMETRY();
 
+  const tooltipStyle = {
+    contentStyle: {
+      backgroundColor: '#050B18',
+      borderColor: 'rgba(0,229,255,0.15)',
+      borderRadius: '12px',
+      boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+    },
+    labelStyle: { color: '#f8fafc', fontWeight: 700 },
+    itemStyle: { color: '#94a3b8' },
+  };
+
+  const statusColor =
+    selectedPole?.status === 'fault'   ? 'text-rose-400 border-rose-800/50 bg-rose-950/50' :
+    selectedPole?.status === 'warning' ? 'text-amber-400 border-amber-800/50 bg-amber-950/50' :
+    selectedPole?.status === 'offline' ? 'text-slate-500 border-slate-700/50 bg-slate-800/50' :
+                                         'text-emerald-400 border-emerald-800/50 bg-emerald-950/50';
+
   return (
-    <div className="space-y-6 pb-12">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <ChartIcon className="h-6 w-6 text-cyan-400" />
-            Real-Time Electrical & Environmental Sensor Telemetry
-          </h2>
-          <p className="text-xs text-slate-400">
-            Time-series telemetry sampled from ACS712, ZMPT101B, LDR and DHT11 modules via ESP32 ADC.
-          </p>
-        </div>
+    <div className="space-y-5 pb-16">
+      {/* ── Header ── */}
+      <div className="glass-card rounded-2xl p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <ChartIcon className="h-5 w-5 text-cyan-400" />
+              <h2 className="text-base font-bold text-white">Real-Time Sensor Telemetry</h2>
+            </div>
+            <p className="text-[11px] text-slate-600">
+              Time-series data sampled from ACS712, ZMPT101B, LDR and DHT11 via ESP32 ADC pins.
+            </p>
+          </div>
 
-        <div className="flex items-center space-x-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
-          <span className="text-xs text-slate-400 font-semibold pl-2">Select Pole Node:</span>
-          <select
-            value={selectedPoleId}
-            onChange={(e) => setSelectedPoleId(e.target.value)}
-            className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-bold text-cyan-300 focus:border-cyan-400 focus:outline-none"
-          >
-            {streetLights.map((light) => (
-              <option key={light.id} value={light.id}>
-                {light.id} - {light.name}
-              </option>
+          <div className="flex items-center gap-3 shrink-0">
+            <label className="text-[11px] text-slate-500 font-semibold">Select Node:</label>
+            <select
+              value={selectedPoleId}
+              onChange={(e) => setSelectedPoleId(e.target.value)}
+              className="tech-select"
+            >
+              {streetLights.map((light) => (
+                <option key={light.id} value={light.id}>
+                  {light.id} — {light.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Live readout strip ── */}
+      {selectedPole && (
+        <div className="glass-card rounded-2xl p-4">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <Cpu className="h-4 w-4 text-cyan-400" />
+            <span className="text-xs font-bold text-white">{selectedPole.id} — {selectedPole.name}</span>
+            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${statusColor}`}>
+              {selectedPole.status}
+            </span>
+            <span className="text-[10px] text-slate-600 ml-auto">{selectedPole.zone}</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {[
+              { label: 'AC Voltage',  value: `${selectedPole.voltage}`,          unit: 'V',    sub: 'ZMPT101B',  icon: <Zap className="h-4 w-4 text-amber-400" />,      cls: 'text-amber-300' },
+              { label: 'AC Current',  value: `${selectedPole.current.toFixed(2)}`,unit: 'A',   sub: 'ACS712',    icon: <Activity className="h-4 w-4 text-cyan-400" />,   cls: 'text-cyan-300' },
+              { label: 'Power Draw',  value: `${selectedPole.power}`,             unit: 'W',    sub: 'Computed',  icon: <Gauge className="h-4 w-4 text-emerald-400" />,   cls: 'text-emerald-300' },
+              { label: 'LDR Level',  value: `${selectedPole.lightIntensity}`,     unit: '%',    sub: 'Photocell', icon: <Sun className="h-4 w-4 text-amber-300" />,       cls: 'text-amber-200' },
+              { label: 'Temperature', value: `${selectedPole.temperature}`,       unit: '°C',   sub: 'DHT11',     icon: <Thermometer className="h-4 w-4 text-rose-400" />, cls: 'text-rose-300' },
+              { label: 'ESP32 Comm',  value: 'LIVE',                              unit: '',     sub: 'MQTT OK',   icon: <Radio className="h-4 w-4 text-emerald-400 animate-pulse" />, cls: 'text-emerald-400' },
+            ].map((s) => (
+              <div key={s.label} className="rounded-xl border border-white/5 bg-[#020617]/70 p-3.5 text-center">
+                <div className="flex justify-center mb-2">{s.icon}</div>
+                <div className="text-[9px] text-slate-600 font-bold uppercase tracking-wider mb-1">{s.label}</div>
+                <div className={`font-mono-tech font-black text-lg ${s.cls}`}>
+                  {s.value}<span className="text-xs font-semibold text-slate-500 ml-0.5">{s.unit}</span>
+                </div>
+                <div className="text-[9px] text-slate-700 mt-1 font-semibold">{s.sub}</div>
+              </div>
             ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 text-center shadow-lg">
-          <span className="text-[10px] font-extrabold uppercase text-slate-500 block">AC Voltage</span>
-          <div className="mt-2 flex items-center justify-center space-x-1">
-            <Zap className="h-4 w-4 text-amber-400" />
-            <span className="text-2xl font-extrabold text-white">{selectedPole.voltage}</span>
-            <span className="text-xs text-slate-400">V</span>
           </div>
-          <span className="text-[10px] text-emerald-400 font-semibold mt-1 block">ZMPT101B Sensor</span>
         </div>
+      )}
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 text-center shadow-lg">
-          <span className="text-[10px] font-extrabold uppercase text-slate-500 block">AC Current</span>
-          <div className="mt-2 flex items-center justify-center space-x-1">
-            <Activity className="h-4 w-4 text-cyan-400" />
-            <span className="text-2xl font-extrabold text-cyan-300">{selectedPole.current}</span>
-            <span className="text-xs text-slate-400">A</span>
-          </div>
-          <span className="text-[10px] text-cyan-400 font-semibold mt-1 block">ACS712 Current</span>
-        </div>
-
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 text-center shadow-lg">
-          <span className="text-[10px] font-extrabold uppercase text-slate-500 block">Power Draw</span>
-          <div className="mt-2 flex items-center justify-center space-x-1">
-            <Gauge className="h-4 w-4 text-emerald-400" />
-            <span className="text-2xl font-extrabold text-emerald-400">{selectedPole.power}</span>
-            <span className="text-xs text-slate-400">W</span>
-          </div>
-          <span className="text-[10px] text-slate-400 font-semibold mt-1 block">Active Load</span>
-        </div>
-
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 text-center shadow-lg">
-          <span className="text-[10px] font-extrabold uppercase text-slate-500 block">LDR Lux Level</span>
-          <div className="mt-2 flex items-center justify-center space-x-1">
-            <Sun className="h-4 w-4 text-amber-300" />
-            <span className="text-2xl font-extrabold text-amber-300">
-              {selectedPole.lightIntensity}%
-            </span>
-          </div>
-          <span className="text-[10px] text-amber-400 font-semibold mt-1 block">Light Intensity</span>
-        </div>
-
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 text-center shadow-lg">
-          <span className="text-[10px] font-extrabold uppercase text-slate-500 block">Pole Temp</span>
-          <div className="mt-2 flex items-center justify-center space-x-1">
-            <Thermometer className="h-4 w-4 text-rose-400" />
-            <span className="text-2xl font-extrabold text-rose-300">
-              {selectedPole.temperature}°C
-            </span>
-          </div>
-          <span className="text-[10px] text-slate-400 font-semibold mt-1 block">DHT11 Module</span>
-        </div>
-
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 text-center shadow-lg">
-          <span className="text-[10px] font-extrabold uppercase text-slate-500 block">ESP32 Comm</span>
-          <div className="mt-2 flex items-center justify-center space-x-1">
-            <Radio className="h-4 w-4 text-emerald-400 animate-pulse" />
-            <span className="text-sm font-extrabold text-emerald-400 uppercase">MQTT OK</span>
-          </div>
-          <span className="text-[10px] text-slate-400 font-mono mt-1 block">Ping: 24ms</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-2xl space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Zap className="h-4 w-4 text-amber-400" />
-              Line Voltage vs Time (24h Cycle)
+      {/* ── Charts ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Voltage */}
+        <div className="glass-card rounded-2xl p-5 space-y-3">
+          <div className="flex items-center justify-between border-b border-white/5 pb-3">
+            <h3 className="text-xs font-bold text-white flex items-center gap-2">
+              <Zap className="h-4 w-4 text-amber-400" /> Line Voltage — 24h Cycle
             </h3>
-            <span className="text-[10px] text-slate-500 font-mono">Unit: Volts AC</span>
+            <span className="text-[10px] text-slate-600 font-mono-tech">ZMPT101B · Volts AC</span>
           </div>
-          <div className="h-64 w-full">
+          <div className="h-56 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={telemetryData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="timeLabel" stroke="#64748b" fontSize={11} />
-                <YAxis domain={[170, 260]} stroke="#64748b" fontSize={11} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px' }}
-                  labelStyle={{ color: '#f8fafc' }}
-                />
-                <Legend />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="timeLabel" stroke="#334155" fontSize={10} tick={{ fill: '#475569' }} />
+                <YAxis domain={[170, 260]} stroke="#334155" fontSize={10} tick={{ fill: '#475569' }} />
+                <Tooltip {...tooltipStyle} />
+                <Legend wrapperStyle={{ fontSize: '11px' }} />
                 <Line
-                  type="monotone"
-                  dataKey="voltage"
-                  name="Line Voltage (V)"
-                  stroke="#f59e0b"
-                  strokeWidth={2.5}
-                  dot={{ r: 3, fill: '#f59e0b' }}
+                  type="monotone" dataKey="voltage" name="Voltage (V)"
+                  stroke="#FFB020" strokeWidth={2.5}
+                  dot={{ r: 2, fill: '#FFB020' }} activeDot={{ r: 5 }}
                 />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-2xl space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Activity className="h-4 w-4 text-cyan-400" />
-              AC Current Draw vs Time (ACS712)
+        {/* Current */}
+        <div className="glass-card rounded-2xl p-5 space-y-3">
+          <div className="flex items-center justify-between border-b border-white/5 pb-3">
+            <h3 className="text-xs font-bold text-white flex items-center gap-2">
+              <Activity className="h-4 w-4 text-cyan-400" /> AC Current Draw — ACS712
             </h3>
-            <span className="text-[10px] text-slate-500 font-mono">Unit: Amperes (A)</span>
+            <span className="text-[10px] text-slate-600 font-mono-tech">Amperes (A)</span>
           </div>
-          <div className="h-64 w-full">
+          <div className="h-56 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={telemetryData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="timeLabel" stroke="#64748b" fontSize={11} />
-                <YAxis domain={[0, 0.6]} stroke="#64748b" fontSize={11} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px' }}
-                  labelStyle={{ color: '#f8fafc' }}
-                />
-                <Legend />
+                <defs>
+                  <linearGradient id="currentGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#00E5FF" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#00E5FF" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="timeLabel" stroke="#334155" fontSize={10} tick={{ fill: '#475569' }} />
+                <YAxis domain={[0, 0.6]} stroke="#334155" fontSize={10} tick={{ fill: '#475569' }} />
+                <Tooltip {...tooltipStyle} />
+                <Legend wrapperStyle={{ fontSize: '11px' }} />
                 <Area
-                  type="monotone"
-                  dataKey="current"
-                  name="Current (A)"
-                  stroke="#38bdf8"
-                  fill="#0284c7"
-                  fillOpacity={0.3}
-                  strokeWidth={2}
+                  type="monotone" dataKey="current" name="Current (A)"
+                  stroke="#00E5FF" fill="url(#currentGrad)" strokeWidth={2}
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-2xl space-y-3 lg:col-span-2">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Gauge className="h-4 w-4 text-emerald-400" />
-              Active Power Consumption Profile (Watts vs Time)
+        {/* Power — full width */}
+        <div className="glass-card rounded-2xl p-5 space-y-3 lg:col-span-2">
+          <div className="flex items-center justify-between border-b border-white/5 pb-3">
+            <h3 className="text-xs font-bold text-white flex items-center gap-2">
+              <Gauge className="h-4 w-4 text-emerald-400" /> Active Power Consumption Profile
             </h3>
-            <span className="text-[10px] text-slate-500 font-mono">Unit: Watts (W)</span>
+            <span className="text-[10px] text-slate-600 font-mono-tech">Watts (W) · 24h</span>
           </div>
-          <div className="h-64 w-full">
+          <div className="h-56 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={telemetryData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="timeLabel" stroke="#64748b" fontSize={11} />
-                <YAxis domain={[0, 120]} stroke="#64748b" fontSize={11} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px' }}
-                  labelStyle={{ color: '#f8fafc' }}
-                />
-                <Legend />
+              <BarChart data={telemetryData} barSize={14}>
+                <defs>
+                  <linearGradient id="powerGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#00F5A0" stopOpacity={0.9} />
+                    <stop offset="95%" stopColor="#00F5A0" stopOpacity={0.4} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="timeLabel" stroke="#334155" fontSize={10} tick={{ fill: '#475569' }} />
+                <YAxis domain={[0, 120]} stroke="#334155" fontSize={10} tick={{ fill: '#475569' }} />
+                <Tooltip {...tooltipStyle} />
+                <Legend wrapperStyle={{ fontSize: '11px' }} />
                 <Bar
-                  dataKey="power"
-                  name="Power Draw (Watts)"
-                  fill="#10b981"
-                  radius={[4, 4, 0, 0]}
+                  dataKey="power" name="Power (W)"
+                  fill="url(#powerGrad)" radius={[4, 4, 0, 0]}
                 />
               </BarChart>
             </ResponsiveContainer>

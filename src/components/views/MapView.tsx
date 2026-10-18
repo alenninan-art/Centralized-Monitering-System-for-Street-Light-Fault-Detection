@@ -203,9 +203,8 @@ export const MapView: React.FC = () => {
       style:       styleUrl,
       center:      defaultCenter,
       zoom:        15.5,
-      pitch:       35,          // subtle tilt for 3-D effect
+      pitch:       35,
       bearing:     0,
-      antialias:   true,
       // Pass CARTO API key for authenticated requests
       transformRequest: (url: string) => {
         if (url.includes('basemaps.cartocdn.com')) {

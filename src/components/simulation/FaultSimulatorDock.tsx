@@ -73,7 +73,7 @@ export const FaultSimulatorDock: React.FC = () => {
         </button>
       ) : (
         <div
-          className="rounded-2xl border border-amber-500/30 bg-[#030914]/97 p-4 shadow-2xl backdrop-blur-2xl w-[340px] space-y-3.5"
+          className="popover-enter rounded-2xl border border-amber-500/30 bg-[#030914]/97 p-4 shadow-2xl backdrop-blur-2xl w-[340px] space-y-3.5"
           style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.8), 0 0 40px rgba(255,176,32,0.08)' }}
         >
           {/* Title bar */}

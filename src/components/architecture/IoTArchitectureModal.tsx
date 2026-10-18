@@ -43,8 +43,8 @@ export const IoTArchitectureModal: React.FC = () => {
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-4xl rounded-2xl border border-cyan-500/30 bg-slate-900 p-6 shadow-2xl shadow-cyan-950/50 max-h-[90vh] overflow-y-auto">
+    <div className="modal-backdrop-enter fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md">
+      <div className="modal-panel-enter relative w-full max-w-4xl rounded-2xl border border-cyan-500/30 bg-slate-900 p-6 shadow-2xl shadow-cyan-950/50 max-h-[90vh] overflow-y-auto">
         <button
           onClick={() => setIsArchitectureModalOpen(false)}
           className="absolute right-4 top-4 rounded-lg bg-slate-800 p-2 text-slate-400 hover:bg-slate-700 hover:text-white"

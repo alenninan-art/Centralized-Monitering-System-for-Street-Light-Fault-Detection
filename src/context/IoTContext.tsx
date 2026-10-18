@@ -120,49 +120,6 @@ export const IoTProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
   }, []);
 
-  // ── Live sensor telemetry tick (working lights only) ──────────────────────
-  // Runs every 4 s. Writes updated sensor values back to Firebase so the
-  // dashboard stays "live" even when no real ESP32 is connected.
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setStreetLights((prevLights) => {
-        const updated = prevLights.map((light) => {
-          if (light.status !== 'working') return light;
-
-          const voltDelta = (Math.random() - 0.5) * 2;
-          const currDelta = (Math.random() - 0.5) * 0.02;
-          const newVolt = Math.max(220, Math.min(240, Math.round((light.voltage + voltDelta) * 10) / 10));
-          const newCurr = Math.max(0.35, Math.min(0.50, Math.round((light.current + currDelta) * 100) / 100));
-          const newPower = Math.round(newVolt * newCurr * 10) / 10;
-
-          return {
-            ...light,
-            voltage: newVolt,
-            current: newCurr,
-            power: light.relayState ? newPower : 0,
-            lastUpdated: 'Just now',
-          };
-        });
-
-        // Async-write updated telemetry to Firebase (fire-and-forget)
-        updated.forEach((light) => {
-          if (light.status === 'working') {
-            updateStreetLightInDB(light.id, {
-              voltage: light.voltage,
-              current: light.current,
-              power: light.power,
-              lastUpdated: light.lastUpdated,
-            }).catch(() => {/* swallow network errors silently */});
-          }
-        });
-
-        return updated;
-      });
-    }, 4000);
-
-    return () => clearInterval(timer);
-  }, []);
-
   // ── Computed system stats ──────────────────────────────────────────────────
   const systemStats = useMemo<SystemStats>(() => {
     const totalLights = streetLights.length;

@@ -75,9 +75,10 @@ body::before {
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(0, 229, 255, 0.12);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(0, 229, 255, 0.06);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 .glass-card:hover {
+  transform: translateY(-2px);
   border-color: rgba(0, 229, 255, 0.22);
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 229, 255, 0.06), inset 0 1px 0 rgba(0, 229, 255, 0.1);
 }
@@ -177,6 +178,52 @@ body::before {
 }
 .float-anim {
   animation: float 3s ease-in-out infinite;
+}
+
+/* ── INTERACTION MOTION ─────────────────────────────── */
+@keyframes pageEnter {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes modalBackdropEnter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes modalPanelEnter {
+  from { opacity: 0; transform: translate3d(0, 12px, 0) scale(0.985); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes popoverEnter {
+  from { opacity: 0; transform: translate3d(0, 6px, 0) scale(0.99); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+.page-transition {
+  animation: pageEnter 260ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+.modal-backdrop-enter {
+  animation: modalBackdropEnter 180ms ease-out both;
+}
+.modal-panel-enter {
+  animation: modalPanelEnter 240ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+.popover-enter {
+  transform-origin: top right;
+  animation: popoverEnter 180ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.app-shell button:not(:disabled) {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: 180ms;
+  transition-timing-function: ease-out;
+}
+.app-shell button:not(:disabled):active {
+  transform: scale(0.98);
+}
+.app-shell input,
+.app-shell select,
+.app-shell textarea {
+  transition: border-color 180ms ease-out, box-shadow 180ms ease-out;
 }
 
 /* ── STATUS BADGES ──────────────────────────────────── */
@@ -331,3 +378,14 @@ body::before {
 /* ── PROGRESS BAR ───────────────────────────────────── */
 .progress-bar-bg { background: rgba(15, 25, 50, 0.9); border-radius: 9999px; overflow: hidden; }
 .progress-bar-fill { height: 100%; border-radius: 9999px; background: linear-gradient(90deg, #00E5FF, #00F5A0); transition: width 0.6s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

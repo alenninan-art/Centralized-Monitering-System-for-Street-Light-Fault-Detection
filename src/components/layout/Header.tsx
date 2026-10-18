@@ -163,7 +163,7 @@ export const Header: React.FC = () => {
           </button>
 
           {isNotificationOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-cyan-500/20 bg-[#050B18]/98 p-4 shadow-2xl z-50 backdrop-blur-2xl"
+            <div className="popover-enter absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-cyan-500/20 bg-[#050B18]/98 p-4 shadow-2xl z-50 backdrop-blur-2xl"
               style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.8), 0 0 30px rgba(0,229,255,0.06)' }}
             >
               <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-3">

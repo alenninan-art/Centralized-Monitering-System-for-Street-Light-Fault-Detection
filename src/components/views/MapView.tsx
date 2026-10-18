@@ -5,6 +5,8 @@ import { useIoT } from '../../context/IoTContext';
 import { MapPin, Layers, AlertTriangle, CheckCircle2, WifiOff, Zap, Filter } from 'lucide-react';
 import type { StreetLight } from '../../types/iot';
 
+maplibregl.setWorkerUrl(`${import.meta.env.BASE_URL}maplibre-gl-worker.mjs`);
+
 // ── CARTO vector tile config ───────────────────────────────────────────────
 const CARTO_API_KEY = 'cb1_4475_1_ed5176ee76c1508082e98380';
 
@@ -182,9 +184,11 @@ export const MapView: React.FC = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef          = useRef<maplibregl.Map | null>(null);
   const markersRef      = useRef<Record<string, { marker: maplibregl.Marker; popup: maplibregl.Popup }>>({});
+  const loadTimeoutRef  = useRef<number | null>(null);
 
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [mapLoaded,    setMapLoaded]    = useState(false);
+  const [mapError,     setMapError]     = useState(false);
   const [mapStyle,     setMapStyle]     = useState<'dark' | 'voyager'>('dark');
 
   const defaultCenter: [number, number] = [77.5946, 12.9716]; // [lng, lat] for maplibre
@@ -224,7 +228,13 @@ export const MapView: React.FC = () => {
     // Scale bar
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: 'metric' }), 'bottom-left');
 
-    map.on('load', () => setMapLoaded(true));
+    loadTimeoutRef.current = window.setTimeout(() => setMapError(true), 15000);
+    map.on('load', () => {
+      if (loadTimeoutRef.current !== null) window.clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+      setMapLoaded(true);
+      setMapError(false);
+    });
 
     mapRef.current = map;
 
@@ -256,6 +266,8 @@ export const MapView: React.FC = () => {
     }
 
     return () => {
+      if (loadTimeoutRef.current !== null) window.clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
       map.remove();
       mapRef.current = null;
     };
@@ -329,12 +341,20 @@ export const MapView: React.FC = () => {
     setMapStyle(next);
     if (mapRef.current) {
       setMapLoaded(false);
+      setMapError(false);
+      if (loadTimeoutRef.current !== null) window.clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = window.setTimeout(() => setMapError(true), 15000);
       const styleUrl =
         next === 'dark'
-          ? `https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json?api_key=${CARTO_API_KEY}`
-          : `https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json?api_key=${CARTO_API_KEY}`;
+          ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
+          : 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
       mapRef.current.setStyle(styleUrl);
-      mapRef.current.once('styledata', () => setMapLoaded(true));
+      mapRef.current.once('style.load', () => {
+        if (loadTimeoutRef.current !== null) window.clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+        setMapLoaded(true);
+        setMapError(false);
+      });
     }
   };
 
@@ -419,8 +439,16 @@ export const MapView: React.FC = () => {
         {/* Loading overlay */}
         {!mapLoaded && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#050B18]/90 gap-3">
-            <div className="h-8 w-8 rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin" />
-            <p className="text-xs font-bold text-cyan-400 tracking-widest uppercase">Loading CARTO vector tiles…</p>
+            {mapError ? (
+              <p className="max-w-sm px-6 text-center text-xs font-semibold text-amber-300">
+                The map is taking too long to load. Check your connection and try switching map style.
+              </p>
+            ) : (
+              <>
+                <div className="h-8 w-8 rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin" />
+                <p className="text-xs font-bold text-cyan-400 tracking-widest uppercase">Loading CARTO vector tiles…</p>
+              </>
+            )}
           </div>
         )}
 

@@ -30,10 +30,10 @@ export const LightDetailModal: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md"
+      className="modal-backdrop-enter fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md"
       onClick={(e) => e.target === e.currentTarget && setIsDetailModalOpen(false)}
     >
-      <div className={`relative w-full max-w-2xl rounded-2xl border ${statusCfg.border} bg-[#050B18] p-6 shadow-2xl max-h-[92vh] overflow-y-auto`}
+      <div className={`modal-panel-enter relative w-full max-w-2xl rounded-2xl border ${statusCfg.border} bg-[#050B18] p-6 shadow-2xl max-h-[92vh] overflow-y-auto`}
         style={{ boxShadow: '0 0 60px rgba(0,229,255,0.06), 0 40px 80px rgba(0,0,0,0.8)' }}
       >
         {/* Close */}

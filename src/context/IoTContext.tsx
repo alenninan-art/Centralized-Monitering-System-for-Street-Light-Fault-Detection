@@ -181,8 +181,14 @@ export const IoTProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           )
         : 0;
 
-    const energySavedPercent = Math.round(100 - (totalPowerWatts / (totalLights * 100)) * 100);
-    const uptimePercent = Number((((totalLights - faultCount - offlineCount) / totalLights) * 100).toFixed(1));
+    const energySavedPercent =
+      totalLights > 0
+        ? Math.round(100 - (totalPowerWatts / (totalLights * 100)) * 100)
+        : 0;
+    const uptimePercent =
+      totalLights > 0
+        ? Number((((totalLights - faultCount - offlineCount) / totalLights) * 100).toFixed(1))
+        : 0;
 
     return {
       totalLights,

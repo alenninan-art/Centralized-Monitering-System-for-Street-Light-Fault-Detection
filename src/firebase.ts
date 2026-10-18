@@ -98,7 +98,7 @@ export function subscribeToStreetLights(
         lat:             l.lat             ?? 0,
         lng:             l.lng             ?? 0,
       }));
-    callback(lights);
+    callback(lights.length > 0 ? lights : INITIAL_STREET_LIGHTS);
   });
 }
 
@@ -106,7 +106,7 @@ export function subscribeToFaults(callback: (faults: FaultRecord[]) => void) {
   const faultsRef = ref(db, "faults");
   return onValue(faultsRef, (snap) => {
     const val = snap.val();
-    if (!val) {
+    if (!val || Object.keys(val).length === 0) {
       callback(INITIAL_FAULTS);
       return;
     }
@@ -123,7 +123,7 @@ export function subscribeToAlerts(
   const alertsRef = ref(db, "alerts");
   return onValue(alertsRef, (snap) => {
     const val = snap.val();
-    if (!val) {
+    if (!val || Object.keys(val).length === 0) {
       callback(INITIAL_ALERTS);
       return;
     }

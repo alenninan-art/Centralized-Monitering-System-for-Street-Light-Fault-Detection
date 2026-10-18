@@ -79,9 +79,15 @@ export const DashboardView: React.FC = () => {
     (l) => l.status === 'fault' || l.status === 'warning'
   );
 
-  const healthPct = Math.round((systemStats.workingCount / systemStats.totalLights) * 100);
-  const faultPct = Math.round((systemStats.faultCount / systemStats.totalLights) * 100);
-  const offlinePct = Math.round((systemStats.offlineCount / systemStats.totalLights) * 100);
+  const healthPct = systemStats.totalLights > 0
+    ? Math.round((systemStats.workingCount / systemStats.totalLights) * 100)
+    : 0;
+  const faultPct = systemStats.totalLights > 0
+    ? Math.round((systemStats.faultCount / systemStats.totalLights) * 100)
+    : 0;
+  const offlinePct = systemStats.totalLights > 0
+    ? Math.round((systemStats.offlineCount / systemStats.totalLights) * 100)
+    : 0;
 
   return (
     <div className="space-y-5 pb-16">

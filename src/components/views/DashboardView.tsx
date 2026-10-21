@@ -336,13 +336,17 @@ export const DashboardView: React.FC = () => {
                   backgroundSize: '20px 20px',
                 }}
               />
-              {/* Fake map dots */}
+              {/* Road corridor */}
+              <div className="absolute inset-x-0 top-[34%] h-[32%] border-y border-slate-500/20 bg-slate-800/70">
+                <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-slate-400/35" />
+              </div>
+              {/* Streetlights aligned along both road edges */}
               {streetLights.slice(0, 18).map((l, i) => (
                 <div key={l.id}
                   className={`absolute h-2 w-2 rounded-full ${l.status === 'working' ? 'bg-emerald-500' : l.status === 'fault' ? 'bg-rose-500 animate-pulse' : l.status === 'warning' ? 'bg-amber-500' : 'bg-slate-600'}`}
                   style={{
                     left: `${5 + (i % 9) * 11}%`,
-                    top: `${15 + Math.floor(i / 9) * 45}%`,
+                    top: `${25 + Math.floor(i / 9) * 50}%`,
                     boxShadow: l.status === 'fault' ? '0 0 8px rgba(255,59,92,0.7)' : l.status === 'working' ? '0 0 4px rgba(0,245,160,0.5)' : 'none',
                   }}
                 />

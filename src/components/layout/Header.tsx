@@ -2,13 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useIoT } from '../../context/IoTContext';
 import {
   Bell,
-  Cpu,
   AlertTriangle,
-  Radio,
   User,
   RotateCcw,
   Zap,
-  Wifi,
   ChevronDown,
 } from 'lucide-react';
 
@@ -33,14 +30,11 @@ const LiveClock: React.FC = () => {
 export const Header: React.FC = () => {
   const {
     alerts,
-    systemStats,
-    setIsArchitectureModalOpen,
     resetSystem,
     markAlertRead,
     clearAllAlerts,
     setActiveTab,
     lastSimulatedEvent,
-    isFirebaseConnected,
   } = useIoT();
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -70,31 +64,6 @@ export const Header: React.FC = () => {
             <span className="text-white">Smart</span>
             <span className="text-cyan-400">Street</span>
           </h1>
-          <p className="text-[10px] text-slate-500 font-medium mt-0.5 leading-tight hidden md:block">
-            IoT Fault Detection & Location Tracking System
-          </p>
-        </div>
-
-        {/* System Online badge — reflects Firebase connection */}
-        <div className={`hidden sm:flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold transition-colors ${
-          isFirebaseConnected
-            ? 'border-emerald-500/25 bg-emerald-950/40 text-emerald-400'
-            : 'border-amber-500/25 bg-amber-950/40 text-amber-400'
-        }`}>
-          <span className="relative flex h-2 w-2">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isFirebaseConnected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-            <span className={`relative inline-flex h-2 w-2 rounded-full ${isFirebaseConnected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-          </span>
-          <Radio className="h-3 w-3" />
-          <span className="uppercase tracking-wider">
-            {isFirebaseConnected ? 'Firebase Live' : 'Connecting...'}
-          </span>
-          {isFirebaseConnected && (
-            <>
-              <span className="text-emerald-600 font-medium">·</span>
-              <span className="text-emerald-300">{systemStats.totalLights - systemStats.offlineCount} Nodes</span>
-            </>
-          )}
         </div>
       </div>
 
@@ -114,27 +83,6 @@ export const Header: React.FC = () => {
 
         {/* Divider */}
         <div className="hidden lg:block w-px h-6 bg-slate-800" />
-
-        {/* IoT Architecture */}
-        <button
-          onClick={() => setIsArchitectureModalOpen(true)}
-          className="hidden sm:flex items-center gap-1.5 rounded-xl border border-cyan-500/20 bg-cyan-950/30 px-3 py-1.5 text-xs font-semibold text-cyan-400 hover:border-cyan-500/50 hover:bg-cyan-950/60 transition-all"
-          title="IoT Architecture Flow"
-        >
-          <Cpu className="h-3.5 w-3.5" />
-          <span className="hidden md:inline">IoT Flow</span>
-        </button>
-
-        {/* Firebase DB connection status */}
-        <div className={`hidden md:flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[10px] font-mono font-bold transition-colors ${
-          isFirebaseConnected
-            ? 'border-emerald-800/40 bg-emerald-950/30 text-emerald-400'
-            : 'border-amber-800/40 bg-amber-950/30 text-amber-400'
-        }`}>
-          <Wifi className={`h-3 w-3 ${isFirebaseConnected ? 'text-emerald-400' : 'text-amber-400'}`} />
-          <span>Firebase</span>
-          <span>{isFirebaseConnected ? 'LIVE' : '...'}</span>
-        </div>
 
         {/* Reset */}
         <button

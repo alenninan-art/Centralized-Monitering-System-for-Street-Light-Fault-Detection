@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useIoT } from '../../context/IoTContext';
-import { GENERATE_HISTORICAL_TELEMETRY } from '../../data/mockStreetLights';
+import type { StreetLight, TelemetryPoint } from '../../types/iot';
 import {
   ResponsiveContainer,
   LineChart,
@@ -26,12 +26,67 @@ import {
   Cpu,
 } from 'lucide-react';
 
+function createTelemetrySample(pole: StreetLight): TelemetryPoint {
+  const timestamp = new Date();
+  return {
+    timestamp: timestamp.toISOString(),
+    timeLabel: timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    voltage: pole.voltage,
+    current: pole.current,
+    power: pole.power,
+    lightIntensity: pole.lightIntensity,
+    temperature: pole.temperature,
+  };
+}
+
 export const SensorDataView: React.FC = () => {
   const { streetLights } = useIoT();
-  const [selectedPoleId, setSelectedPoleId] = useState<string>('SL-001');
+  const initialPole = streetLights.find((light) => light.id === 'SL-001') || streetLights[0];
+  const [selectedPoleId, setSelectedPoleId] = useState<string>(initialPole?.id ?? 'SL-001');
 
   const selectedPole = streetLights.find((l) => l.id === selectedPoleId) || streetLights[0];
-  const telemetryData = GENERATE_HISTORICAL_TELEMETRY();
+  const latestPoleRef = useRef<StreetLight | undefined>(selectedPole);
+  const [telemetryData, setTelemetryData] = useState<TelemetryPoint[]>(
+    () => initialPole ? [createTelemetrySample(initialPole)] : []
+  );
+
+  useEffect(() => {
+    latestPoleRef.current = selectedPole;
+  }, [selectedPole]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const pole = latestPoleRef.current;
+      if (pole) {
+        setTelemetryData((previous) => [...previous, createTelemetrySample(pole)].slice(-24));
+      }
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const handlePoleChange = (poleId: string) => {
+    const pole = streetLights.find((light) => light.id === poleId);
+    latestPoleRef.current = pole;
+    setSelectedPoleId(poleId);
+    setTelemetryData(pole ? [createTelemetrySample(pole)] : []);
+  };
+
+  const voltagePadding = Math.max(5, (selectedPole?.voltage ?? 0) * 0.05);
+  const voltageDomain: [number, number] = selectedPole
+    ? [
+        Math.max(0, selectedPole.voltage - voltagePadding),
+        selectedPole.voltage + voltagePadding,
+      ]
+    : [0, 260];
+  const currentDomain: [number, number] = [
+    0,
+    Math.max(0.1, (selectedPole?.current ?? 0) * 1.1),
+  ];
+  const powerDomain: [number, number] = [
+    0,
+    Math.max(1, (selectedPole?.power ?? 0) * 1.1),
+  ];
 
   const tooltipStyle = {
     contentStyle: {
@@ -69,7 +124,7 @@ export const SensorDataView: React.FC = () => {
             <label className="text-[11px] text-slate-500 font-semibold">Select Node:</label>
             <select
               value={selectedPoleId}
-              onChange={(e) => setSelectedPoleId(e.target.value)}
+              onChange={(e) => handlePoleChange(e.target.value)}
               className="tech-select"
             >
               {streetLights.map((light) => (
@@ -122,22 +177,22 @@ export const SensorDataView: React.FC = () => {
         <div className="glass-card rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between border-b border-white/5 pb-3">
             <h3 className="text-xs font-bold text-white flex items-center gap-2">
-              <Zap className="h-4 w-4 text-amber-400" /> Line Voltage — 24h Cycle
+              <Zap className="h-4 w-4 text-amber-400" /> Line Voltage — Live Samples
             </h3>
-            <span className="text-[10px] text-slate-600 font-mono-tech">ZMPT101B · Volts AC</span>
+            <span className="text-[10px] text-slate-600 font-mono-tech">5-second samples · Volts AC</span>
           </div>
           <div className="h-56 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={telemetryData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                 <XAxis dataKey="timeLabel" stroke="#334155" fontSize={10} tick={{ fill: '#475569' }} />
-                <YAxis domain={[170, 260]} stroke="#334155" fontSize={10} tick={{ fill: '#475569' }} />
+                <YAxis domain={voltageDomain} stroke="#334155" fontSize={10} tick={{ fill: '#475569' }} />
                 <Tooltip {...tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: '11px' }} />
                 <Line
-                  type="monotone" dataKey="voltage" name="Voltage (V)"
+                  type="linear" dataKey="voltage" name="Voltage (V)"
                   stroke="#FFB020" strokeWidth={2.5}
-                  dot={{ r: 2, fill: '#FFB020' }} activeDot={{ r: 5 }}
+                  dot={{ r: 4, fill: '#FFB020' }} activeDot={{ r: 5 }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -150,7 +205,7 @@ export const SensorDataView: React.FC = () => {
             <h3 className="text-xs font-bold text-white flex items-center gap-2">
               <Activity className="h-4 w-4 text-cyan-400" /> AC Current Draw — ACS712
             </h3>
-            <span className="text-[10px] text-slate-600 font-mono-tech">Amperes (A)</span>
+            <span className="text-[10px] text-slate-600 font-mono-tech">5-second samples · Amperes (A)</span>
           </div>
           <div className="h-56 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -163,12 +218,13 @@ export const SensorDataView: React.FC = () => {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                 <XAxis dataKey="timeLabel" stroke="#334155" fontSize={10} tick={{ fill: '#475569' }} />
-                <YAxis domain={[0, 0.6]} stroke="#334155" fontSize={10} tick={{ fill: '#475569' }} />
+                <YAxis domain={currentDomain} stroke="#334155" fontSize={10} tick={{ fill: '#475569' }} />
                 <Tooltip {...tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: '11px' }} />
                 <Area
-                  type="monotone" dataKey="current" name="Current (A)"
+                  type="linear" dataKey="current" name="Current (A)"
                   stroke="#00E5FF" fill="url(#currentGrad)" strokeWidth={2}
+                  dot={{ r: 4, fill: '#00E5FF' }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -179,9 +235,9 @@ export const SensorDataView: React.FC = () => {
         <div className="glass-card rounded-2xl p-5 space-y-3 lg:col-span-2">
           <div className="flex items-center justify-between border-b border-white/5 pb-3">
             <h3 className="text-xs font-bold text-white flex items-center gap-2">
-              <Gauge className="h-4 w-4 text-emerald-400" /> Active Power Consumption Profile
+              <Gauge className="h-4 w-4 text-emerald-400" /> Active Power — Latest Reading
             </h3>
-            <span className="text-[10px] text-slate-600 font-mono-tech">Watts (W) · 24h</span>
+            <span className="text-[10px] text-slate-600 font-mono-tech">5-second samples · Watts (W)</span>
           </div>
           <div className="h-56 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -194,7 +250,7 @@ export const SensorDataView: React.FC = () => {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                 <XAxis dataKey="timeLabel" stroke="#334155" fontSize={10} tick={{ fill: '#475569' }} />
-                <YAxis domain={[0, 120]} stroke="#334155" fontSize={10} tick={{ fill: '#475569' }} />
+                <YAxis domain={powerDomain} stroke="#334155" fontSize={10} tick={{ fill: '#475569' }} />
                 <Tooltip {...tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: '11px' }} />
                 <Bar

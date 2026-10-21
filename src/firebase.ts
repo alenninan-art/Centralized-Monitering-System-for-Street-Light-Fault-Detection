@@ -29,7 +29,23 @@ export async function seedDatabaseIfEmpty(): Promise<void> {
   try {
     const snap = await get(ref(db, "streetlights"));
     if (snap.exists()) {
-      console.log("[Firebase] DB already seeded, skipping.");
+      const savedLights = snap.val() as Record<string, Partial<StreetLight>>;
+      const coordinateUpdates: Record<string, number> = {};
+
+      INITIAL_STREET_LIGHTS.forEach((light) => {
+        const savedLight = savedLights[light.id];
+        if (savedLight && (savedLight.lat !== light.lat || savedLight.lng !== light.lng)) {
+          coordinateUpdates[`${light.id}/lat`] = light.lat;
+          coordinateUpdates[`${light.id}/lng`] = light.lng;
+        }
+      });
+
+      if (Object.keys(coordinateUpdates).length > 0) {
+        await update(ref(db, "streetlights"), coordinateUpdates);
+        console.log("[Firebase] Updated demo streetlight coordinates to the MG Road route.");
+      } else {
+        console.log("[Firebase] DB already seeded with current streetlight coordinates.");
+      }
       return;
     }
 

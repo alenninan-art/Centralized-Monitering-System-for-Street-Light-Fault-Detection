@@ -4,7 +4,7 @@ import type { StreetLight, FaultRecord, AlertNotification, TelemetryPoint, Hardw
 const BASE_LAT = 12.9716;
 const BASE_LNG = 77.5946;
 
-export const INITIAL_STREET_LIGHTS: StreetLight[] = [
+const MOCK_STREET_LIGHTS: StreetLight[] = [
   {
     id: 'SL-001',
     name: 'Main Road Pole 01',
@@ -776,6 +776,49 @@ export const INITIAL_STREET_LIGHTS: StreetLight[] = [
     zone: 'Zone F - Residential Sector',
   },
 ];
+
+const KOCHI_MG_ROAD_POLE_COORDINATES: readonly [number, number][] = [
+  [76.2816559, 9.9856480],
+  [76.2815265, 9.9856041],
+  [76.2817981, 9.9852356],
+  [76.2816686, 9.9851918],
+  [76.2819454, 9.9848270],
+  [76.2818171, 9.9847798],
+  [76.2821040, 9.9844229],
+  [76.2819773, 9.9843718],
+  [76.2822698, 9.9840193],
+  [76.2821431, 9.9839682],
+  [76.2824186, 9.9836051],
+  [76.2822890, 9.9835616],
+  [76.2825595, 9.9831924],
+  [76.2824299, 9.9831489],
+  [76.2827005, 9.9827796],
+  [76.2825709, 9.9827361],
+  [76.2828415, 9.9823669],
+  [76.2827119, 9.9823234],
+  [76.2829780, 9.9819518],
+  [76.2828479, 9.9819099],
+  [76.2831033, 9.9815236],
+  [76.2829682, 9.9815022],
+  [76.2831641, 9.9810873],
+  [76.2830278, 9.9810757],
+  [76.2832176, 9.9806599],
+  [76.2830825, 9.9806387],
+  [76.2832815, 9.9802284],
+  [76.2831463, 9.9802080],
+  [76.2833520, 9.9798027],
+  [76.2832183, 9.9797738],
+  [76.2834534, 9.9793820],
+  [76.2833212, 9.9793470],
+  [76.2835707, 9.9789648],
+  [76.2834400, 9.9789248],
+  [76.2837122, 9.9785581],
+];
+
+export const INITIAL_STREET_LIGHTS: StreetLight[] = MOCK_STREET_LIGHTS.map((light, index) => {
+  const [lng, lat] = KOCHI_MG_ROAD_POLE_COORDINATES[index];
+  return { ...light, lat, lng };
+});
 
 export const INITIAL_FAULTS: FaultRecord[] = [
   {

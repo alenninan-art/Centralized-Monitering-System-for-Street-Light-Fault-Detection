@@ -9,12 +9,8 @@ import {
   History,
   Bell,
   Settings,
-  Activity,
-  Cpu,
-  TrendingUp,
   ChevronLeft,
   ChevronRight,
-  Zap,
 } from 'lucide-react';
 
 interface NavItem {
@@ -52,14 +48,6 @@ export const Sidebar: React.FC = () => {
     },
     { id: 'map', label: 'Location Map', icon: MapPin, sublabel: 'GPS Tracking' },
     { id: 'sensors', label: 'Sensor Data', icon: LineChart, sublabel: 'Telemetry' },
-    {
-      id: 'hardware',
-      label: 'Hardware / BOM',
-      icon: Cpu,
-      badge: '17',
-      badgeVariant: 'cyan',
-      sublabel: 'Components',
-    },
     { id: 'history', label: 'Fault History', icon: History, sublabel: 'Log' },
     {
       id: 'alerts',
@@ -153,67 +141,6 @@ export const Sidebar: React.FC = () => {
         </nav>
       </div>
 
-      {/* Bottom: Network Telemetry Panel */}
-      {!collapsed && (
-        <div className="m-2 rounded-xl border border-white/5 bg-[#020617]/80 p-3 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <Activity className="h-3.5 w-3.5 text-cyan-400" />
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Network Telemetry</span>
-            </div>
-            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
-              systemStats.faultCount > 0
-                ? 'bg-rose-950/60 text-rose-400 border-rose-800/40'
-                : 'bg-emerald-950/60 text-emerald-400 border-emerald-800/40'
-            }`}>
-              {systemStats.uptimePercent}% UP
-            </span>
-          </div>
-
-          {/* Stats grid */}
-          <div className="grid grid-cols-2 gap-1.5">
-            {[
-              { label: 'Total', value: systemStats.totalLights, color: 'text-cyan-300' },
-              { label: 'Working', value: systemStats.workingCount, color: 'text-emerald-400' },
-              { label: 'Faults', value: systemStats.faultCount, color: systemStats.faultCount > 0 ? 'text-rose-400' : 'text-slate-500' },
-              { label: 'Offline', value: systemStats.offlineCount, color: 'text-slate-400' },
-            ].map((s) => (
-              <div key={s.label} className="rounded-lg bg-[#020617] p-2 border border-white/3 text-center">
-                <p className="text-[9px] text-slate-600 font-semibold uppercase">{s.label}</p>
-                <p className={`text-sm font-black mt-0.5 ${s.color}`}>{s.value}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Power load */}
-          <div className="flex items-center justify-between text-[10px]">
-            <div className="flex items-center gap-1 text-slate-500">
-              <Zap className="h-3 w-3 text-amber-400" />
-              <span>Power Load</span>
-            </div>
-            <span className="font-mono font-bold text-cyan-300">{(systemStats.totalPowerWatts / 1000).toFixed(2)} kW</span>
-          </div>
-
-          {/* Uptime bar */}
-          <div className="progress-bar-bg h-1">
-            <div className="progress-bar-fill" style={{ width: `${systemStats.uptimePercent}%` }} />
-          </div>
-
-          {/* Last sync */}
-          <div className="flex items-center gap-1 text-[9px] text-slate-600">
-            <TrendingUp className="h-3 w-3 text-cyan-600" />
-            <span>Last sync: Just now</span>
-          </div>
-        </div>
-      )}
-
-      {/* Collapsed: small power indicator */}
-      {collapsed && (
-        <div className="m-2 rounded-xl border border-white/5 bg-[#020617]/80 p-2 flex flex-col items-center gap-1">
-          <Zap className="h-3.5 w-3.5 text-amber-400" />
-          <span className="text-[9px] font-mono text-cyan-400">{(systemStats.totalPowerWatts / 1000).toFixed(1)}k</span>
-        </div>
-      )}
     </aside>
   );
 };

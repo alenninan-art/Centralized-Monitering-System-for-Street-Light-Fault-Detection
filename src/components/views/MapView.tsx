@@ -25,6 +25,8 @@ const STATUS_ICONS: Record<string, string> = {
   offline: '⚫',
 };
 
+const KOCHI_ROAD_CENTER: [number, number] = [76.28299, 9.98251];
+
 // Build an animated SVG/HTML marker element
 function createMarkerEl(light: StreetLight): HTMLDivElement {
   const cfg = STATUS_COLORS[light.status] ?? STATUS_COLORS.offline;
@@ -43,7 +45,7 @@ function createMarkerEl(light: StreetLight): HTMLDivElement {
   el.innerHTML = `
     <div style="
       position:relative;
-      width:36px;height:36px;
+      width:28px;height:28px;
       background:${cfg.fill};
       border:2.5px solid #0f172a;
       border-radius:50%;
@@ -53,10 +55,10 @@ function createMarkerEl(light: StreetLight): HTMLDivElement {
       transition:transform 0.2s ease;
     ">
       ${pulse}
-      <span style="font-size:17px;line-height:1;position:relative;z-index:1">${STATUS_ICONS[light.status] ?? '💡'}</span>
+      <span style="font-size:13px;line-height:1;position:relative;z-index:1">${STATUS_ICONS[light.status] ?? '💡'}</span>
     </div>`;
 
-  el.style.cssText = 'width:36px;height:36px;';
+  el.style.cssText = 'width:28px;height:28px;';
   el.addEventListener('mouseenter', () => {
     (el.firstElementChild as HTMLElement).style.transform = 'scale(1.25)';
   });
@@ -191,7 +193,7 @@ export const MapView: React.FC = () => {
   const [mapError,     setMapError]     = useState(false);
   const [mapStyle,     setMapStyle]     = useState<'dark' | 'voyager'>('dark');
 
-  const defaultCenter: [number, number] = [77.5946, 12.9716]; // [lng, lat] for maplibre
+  const defaultCenter = KOCHI_ROAD_CENTER;
 
   // ── 1. Init MapLibre ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -207,7 +209,7 @@ export const MapView: React.FC = () => {
       style:       styleUrl,
       center:      defaultCenter,
       zoom:        15.5,
-      pitch:       35,
+      pitch:       0,
       bearing:     0,
       // Pass CARTO API key for authenticated requests
       transformRequest: (url: string) => {
@@ -291,12 +293,13 @@ export const MapView: React.FC = () => {
       : streetLights.filter((l) => l.status === filterStatus);
 
     visible.forEach((light) => {
+      const mapLight = { ...light, location: 'MG Road corridor, Kochi (demo layout)' };
       const el    = createMarkerEl(light);
       const popup = new maplibregl.Popup({
         offset: 20,
         closeButton: true,
         maxWidth: '320px',
-      }).setHTML(buildPopupHTML(light));
+      }).setHTML(buildPopupHTML(mapLight));
 
       popup.on('open', () => {
         // Wire the inspect button inside the popup
@@ -318,11 +321,11 @@ export const MapView: React.FC = () => {
   // ── 3. Fly to selected pole ───────────────────────────────────────────────
   useEffect(() => {
     if (!selectedPoleId || !mapRef.current || !mapLoaded) return;
-    const light = streetLights.find((l) => l.id === selectedPoleId);
-    if (!light) return;
+    const marker = markersRef.current[selectedPoleId]?.marker;
+    if (!marker) return;
 
     mapRef.current.flyTo({
-      center:   [light.lng, light.lat],
+      center:   marker.getLngLat().toArray(),
       zoom:     18,
       pitch:    45,
       duration: 1500,
@@ -331,9 +334,27 @@ export const MapView: React.FC = () => {
 
     setTimeout(() => {
       const entry = markersRef.current[selectedPoleId];
-      if (entry) entry.marker.togglePopup();
+      if (entry && !entry.popup.isOpen()) entry.marker.togglePopup();
     }, 1600);
   }, [selectedPoleId, mapLoaded]);
+
+  const focusPoleOnMap = (light: StreetLight) => {
+    setFilterStatus('all');
+    setSelectedPoleId(light.id);
+
+    mapRef.current?.flyTo({
+      center: [light.lng, light.lat],
+      zoom: 18,
+      pitch: 45,
+      duration: 1500,
+      essential: true,
+    });
+
+    window.setTimeout(() => {
+      const entry = markersRef.current[light.id];
+      if (entry && !entry.popup.isOpen()) entry.marker.togglePopup();
+    }, 1600);
+  };
 
   // ── 4. Style toggle (dark / voyager) ─────────────────────────────────────
   const handleStyleToggle = () => {
@@ -389,7 +410,7 @@ export const MapView: React.FC = () => {
               </span>
             </div>
             <p className="text-[11px] text-slate-600">
-              WebGL-powered vector tile map · {counts.total} poles · Real-time fault geolocation
+              Kochi, Kerala · MG Road demo corridor · {counts.total} roadside poles
             </p>
           </div>
 
@@ -456,10 +477,10 @@ export const MapView: React.FC = () => {
         <div className="absolute top-4 right-4 z-20 w-52 rounded-2xl border border-white/8 bg-[#050B18]/90 p-4 shadow-2xl backdrop-blur-xl">
           <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-3 flex items-center gap-1.5">
             <AlertTriangle className="h-3 w-3 text-rose-500" />
-            Active Faults
+            Faults &amp; Offline
           </p>
 
-          {counts.fault === 0 ? (
+          {counts.fault === 0 && counts.offline === 0 ? (
             <div className="text-center py-3">
               <CheckCircle2 className="h-6 w-6 text-emerald-500/50 mx-auto mb-1" />
               <p className="text-[11px] text-emerald-400 font-semibold">All Nodes Clear</p>
@@ -467,19 +488,27 @@ export const MapView: React.FC = () => {
           ) : (
             <div className="space-y-2 max-h-52 overflow-y-auto pr-0.5">
               {streetLights
-                .filter(l => l.status === 'fault')
+                .filter(l => l.status === 'fault' || l.status === 'offline')
                 .map(light => (
                   <button
                     key={light.id}
-                    onClick={() => setSelectedPoleId(light.id)}
-                    className="flex w-full items-center justify-between rounded-xl bg-rose-950/60 p-2.5 text-[10px] font-bold text-rose-300 hover:bg-rose-900/60 border border-rose-900/50 transition-all"
+                    onClick={() => focusPoleOnMap(light)}
+                    className={`flex w-full items-center justify-between rounded-xl p-2.5 text-[10px] font-bold transition-all ${
+                      light.status === 'fault'
+                        ? 'bg-rose-950/60 text-rose-300 hover:bg-rose-900/60 border border-rose-900/50'
+                        : 'bg-slate-800/70 text-slate-300 hover:bg-slate-700/70 border border-slate-600/50'
+                    }`}
                   >
                     <div className="flex items-center gap-2 text-left">
-                      <span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse shrink-0" />
+                      <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                        light.status === 'fault' ? 'bg-rose-400 animate-pulse' : 'bg-slate-400'
+                      }`} />
                       <div>
                         <div className="font-black">{light.id}</div>
-                        <div className="text-rose-500 font-semibold text-[9px] truncate max-w-24">
-                          {light.faultType.replace(/_/g,' ')}
+                        <div className={`font-semibold text-[9px] truncate max-w-24 ${
+                          light.status === 'fault' ? 'text-rose-500' : 'text-slate-400'
+                        }`}>
+                          {light.status === 'offline' ? 'Offline' : light.faultType.replace(/_/g,' ')}
                         </div>
                       </div>
                     </div>

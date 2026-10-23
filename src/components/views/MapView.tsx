@@ -84,6 +84,13 @@ function buildPopupHTML(light: StreetLight): string {
     warning: '#1c1000',
     offline: '#0f1729',
   };
+  const lat = typeof light.lat === 'number' ? light.lat : 0;
+  const lng = typeof light.lng === 'number' ? light.lng : 0;
+  const latDir = lat >= 0 ? 'N' : 'S';
+  const lngDir = lng >= 0 ? 'E' : 'W';
+  const coordText = `${Math.abs(lat).toFixed(6)}° ${latDir}, ${Math.abs(lng).toFixed(6)}° ${lngDir}`;
+  const locText = (light.location || 'MG Road corridor, Kochi').replace(' (demo layout)', '');
+
   return `
     <div style="
       min-width:260px;max-width:300px;
@@ -111,14 +118,22 @@ function buildPopupHTML(light: StreetLight): string {
         ">${light.status}</span>
       </div>
 
-      <!-- Location -->
+      <!-- Coordinates & Location Box -->
       <div style="
-        display:flex;align-items:center;gap:6px;
         font-size:11px;color:#94a3b8;
         margin-bottom:12px;
         background:#020617;padding:8px 10px;border-radius:10px;
+        border:1px solid rgba(0,229,255,0.18);
       ">
-        📍 <span style="font-weight:600;">${light.location}</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:12px;">📍</span>
+          <span style="font-weight:700;color:#00E5FF;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:11px;letter-spacing:0.02em;">
+            ${coordText}
+          </span>
+        </div>
+        <div style="margin-top:3px;padding-left:19px;font-size:9.5px;color:#64748b;font-weight:500;">
+          ${locText}
+        </div>
       </div>
 
       <!-- Sensor readings -->
@@ -293,7 +308,7 @@ export const MapView: React.FC = () => {
       : streetLights.filter((l) => l.status === filterStatus);
 
     visible.forEach((light) => {
-      const mapLight = { ...light, location: 'MG Road corridor, Kochi (demo layout)' };
+      const mapLight = { ...light, location: 'MG Road corridor, Kochi' };
       const el    = createMarkerEl(light);
       const popup = new maplibregl.Popup({
         offset: 20,

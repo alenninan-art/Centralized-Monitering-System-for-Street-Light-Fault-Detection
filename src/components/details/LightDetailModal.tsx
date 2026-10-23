@@ -113,9 +113,9 @@ export const LightDetailModal: React.FC = () => {
               <Cpu className="h-3.5 w-3.5" /> Hardware Metadata
             </h4>
             {[
-              { label: 'ESP32 Device ID',   value: light.esp32DeviceId,                            mono: true },
-              { label: 'GPS Coordinates',   value: `${light.lat.toFixed(4)}°N, ${light.lng.toFixed(4)}°E`, mono: true },
-              { label: 'Installation Date', value: light.installationDate,                         mono: false },
+              { label: 'ESP32 Device ID',   value: light.esp32DeviceId, mono: true },
+              { label: 'GPS Coordinates',   value: `${light.lat.toFixed(6)}° N, ${light.lng.toFixed(6)}° E`, mono: true },
+              { label: 'Installation Date', value: light.installationDate, mono: false },
               { label: 'Last Telemetry',    value: light.lastUpdated,                              mono: false, highlight: 'text-emerald-400' },
             ].map((r) => (
               <div key={r.label} className="flex justify-between items-center text-[11px]">
